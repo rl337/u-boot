@@ -1,0 +1,58 @@
+name: Matrix U-Boot Build for Muffin Cluster
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: alpine-latest
+    strategy:
+      matrix:
+        include:
+          - name: qemu-a72
+            defconfig: qemu_arm64_defconfig
+            cross: aarch64-none-elf-
+            cflags: -mcpu=cortex-a72
+
+          - name: qemu-a76
+            defconfig: qemu_arm64_defconfig
+            cross: aarch64-none-elf-
+            cflags: -mcpu=cortex-a76
+
+          - name: rpi4
+            defconfig: rpi_4_defconfig
+            cross: aarch64-none-elf-
+
+          - name: rpi5
+            defconfig: rpi_arm64_defconfig
+            cross: aarch64-none-elf-
+            cflags: -mcpu=cortex-a76
+
+    steps:
+      - name: Checkout U-Boot source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apk update
+          sudo apk add build-base mtools p7zip qemu bison flex gcc-aarch64-none-elf openssl-dev gnutls-dev
+
+      - name: Configure U-Boot (${{ matrix.name }})
+        run: |
+          make distclean
+          make ${{ matrix.defconfig }}
+
+      - name: Build U-Boot
+        run: |
+          make CROSS_COMPILE=${{ matrix.cross }} CFLAGS="${{ matrix.cflags || '' }}" -j$(nproc)
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: u-boot-${{ matrix.name }}
+          path: |
+            u-boot.bin
+            u-boot.elf
